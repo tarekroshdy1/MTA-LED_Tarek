@@ -7,10 +7,11 @@ from adafruit_datetime import datetime
 from adafruit_bitmap_font import bitmap_font
 from adafruit_matrixportal.matrix import Matrix
 from adafruit_matrixportal.network import Network
+from adafruit_pyportal import PyPortal
 
 STOP_ID = 'A44'
 DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/A44'
-DATA_LOCATION = ["data"]
+DATA_LOCATION = "./data"
 UPDATE_DELAY = 15
 SYNC_TIME_DELAY = 30
 MINIMUM_MINUTES_DISPLAY = 1
@@ -24,7 +25,7 @@ def get_arrival_in_minutes_from_now(now, date_str):
 def get_arrival_times():
     print("Fetching arrival times...")
     try:
-        stop_trains = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION))
+        stop_trains = network.fetch_data(DATA_SOURCE, json_path=("./data"))
         print("Data fetched: ", stop_trains)
     except Exception as e:
         print("Error fetching data: ", e)
