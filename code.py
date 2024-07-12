@@ -9,44 +9,52 @@ from adafruit_matrixportal.matrix import Matrix
 from adafruit_matrixportal.network import Network
 
 STOP_ID = 'A44'
-DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/%s' % (STOP_ID,)
+DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/A44'
 DATA_LOCATION = ["data"]
 UPDATE_DELAY = 15
 SYNC_TIME_DELAY = 30
-MINIMUM_MINUTES_DISPLAY = 9
+MINIMUM_MINUTES_DISPLAY = 1
 BACKGROUND_IMAGE = 'dashboard.bmp'
 ERROR_RESET_THRESHOLD = 3
 
 def get_arrival_in_minutes_from_now(now, date_str):
-    train_date = datetime.fromisoformat(date_str).replace(tzinfo=None) # Remove tzinfo to be able to diff dates
-    return round((train_date-now).total_seconds()/60.0)
+    train_date = datetime.fromisoformat(date_str).replace(tzinfo=None)
+    return round((train_date - now).total_seconds() / 60.0)
 
 def get_arrival_times():
-    stop_trains =  network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
+    print("Fetching arrival times...")
+    try:
+        stop_trains = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION))
+        print("Data fetched: ", stop_trains)
+    except Exception as e:
+        print("Error fetching data: ", e)
+        raise e
+
+    print("Stop retrieved")
     stop_data = stop_trains[0]
     stop_dataextra = stop_trains[1]
-    nortbound_trains = [x['time'] for x in stop_data['N']]
+    northbound_trains = [x['time'] for x in stop_data['N']]
     southbound_trains = [x['time'] for x in stop_dataextra['N']]
 
     now = datetime.now()
     print("Now: ", now)
 
-    nortbound_arrivals = [get_arrival_in_minutes_from_now(now, x) for x in nortbound_trains]
-    southound_arrivals = [get_arrival_in_minutes_from_now(now, x) for x in southbound_trains]
+    northbound_arrivals = [get_arrival_in_minutes_from_now(now, x) for x in northbound_trains]
+    southbound_arrivals = [get_arrival_in_minutes_from_now(now, x) for x in southbound_trains]
 
-    n = [str(x) for x in nortbound_arrivals if x>= MINIMUM_MINUTES_DISPLAY]
-    s = [str(x) for x in southound_arrivals if x>= MINIMUM_MINUTES_DISPLAY]
+    n = [str(x) for x in northbound_arrivals if x >= MINIMUM_MINUTES_DISPLAY]
+    s = [str(x) for x in southbound_arrivals if x >= MINIMUM_MINUTES_DISPLAY]
 
     n0 = n[0] if len(n) > 0 else '-'
     n1 = n[1] if len(n) > 1 else '-'
     s0 = s[0] if len(s) > 0 else '-'
     s1 = s[1] if len(s) > 1 else '-'
 
-    return n0,n1,s0,s1
+    return n0, n1, s0, s1
 
 def update_text(n0, n1, s0, s1):
-    text_lines[2].text = "%s,%s m" % (n0,n1)
-    text_lines[4].text = "%s,%s m" % (s0,s1)
+    text_lines[2].text = "%s,%s m" % (n0, n1)
+    text_lines[4].text = "%s,%s m" % (s0, s1)
     display.root_group = group
 
 # --- Display setup ---
@@ -77,14 +85,17 @@ while True:
     try:
         if last_time_sync is None or time.monotonic() > last_time_sync + SYNC_TIME_DELAY:
             # Sync clock to minimize time drift
+            print("Syncing local time...")
             network.get_local_time()
             last_time_sync = time.monotonic()
         arrivals = get_arrival_times()
         update_text(*arrivals)
-    except (ValueError, RuntimeError) as e:
-        print("Some error occured, retrying! -", e)
-        error_counter = error_counter + 1
+        error_counter = 0  # Reset error counter on successful fetch
+    except (ValueError, RuntimeError, Exception) as e:
+        print("Some error occurred, retrying! -", e)
+        error_counter += 1
         if error_counter > ERROR_RESET_THRESHOLD:
+            print("Error threshold exceeded, resetting microcontroller...")
             microcontroller.reset()
 
     time.sleep(UPDATE_DELAY)
